@@ -6,6 +6,9 @@
 
 namespace IW
 {
+    v8::Local<v8::Object> packTargetInfo(v8::Isolate *isolate, TargetInfo &ti);
+    v8::Local<v8::Array> packTargetInfoList(v8::Isolate *isolate, TargetInfoList target);
+
     v8::Local<v8::Object> packBoundingRect(v8::Isolate *isolate, RECT boundingRect)
     {
         v8::Local<v8::Object> packedBoundingRect = v8::Object::New(isolate);
@@ -20,29 +23,6 @@ namespace IW
         return packedBoundingRect;
     }
 
-    v8::Local<v8::Object> packTargetElement(v8::Isolate *isolate, TargetElement target)
-    {
-        v8::Local<v8::Object> packedTargetElement = v8::Object::New(isolate);
-
-        packedTargetElement->Set(v8::String::NewFromUtf8(isolate, "name"), v8::String::NewFromTwoByte(isolate, (uint16_t *)target.name));
-        packedTargetElement->Set(v8::String::NewFromUtf8(isolate, "controleType"), v8::String::NewFromTwoByte(isolate, (uint16_t *)target.controleType));
-        packedTargetElement->Set(v8::String::NewFromUtf8(isolate, "boundingRect"), packBoundingRect(isolate, target.boundingRectangle));
-        packedTargetElement->Set(v8::String::NewFromUtf8(isolate, "isContent"), v8::Boolean::New(isolate, target.isContent));
-        packedTargetElement->Set(v8::String::NewFromUtf8(isolate, "isControl"), v8::Boolean::New(isolate, target.isControle));
-
-        return packedTargetElement;
-    }
-
-    v8::Local<v8::Array> packTargetElementList(v8::Isolate *isolate, TargetElementList target)
-    {
-        v8::Local<v8::Array> packedTargetElementList = v8::Array::New(isolate, target.length);
-
-        for (uint32_t i = 0; i < target.length; i++)
-            packedTargetElementList->Set(i, packTargetElement(isolate, target.elements[i]));
-
-        return packedTargetElementList;
-    }
-
     v8::Local<v8::Object> packAnnotaion(v8::Isolate *isolate, Annotation *annotation)
     {
         v8::Local<v8::Object> packedAnnotation = v8::Object::New(isolate);
@@ -50,7 +30,7 @@ namespace IW
         packedAnnotation->Set(v8::String::NewFromUtf8(isolate, "name"), v8::String::NewFromTwoByte(isolate, (uint16_t *)annotation->name));
         packedAnnotation->Set(v8::String::NewFromUtf8(isolate, "author"), v8::String::NewFromTwoByte(isolate, (uint16_t *)annotation->author));
         packedAnnotation->Set(v8::String::NewFromUtf8(isolate, "dateTime"), v8::String::NewFromTwoByte(isolate, (uint16_t *)annotation->dateTime));
-        packedAnnotation->Set(v8::String::NewFromUtf8(isolate, "dateTime"), packTargetElement(isolate, annotation->target));
+        packedAnnotation->Set(v8::String::NewFromUtf8(isolate, "target"), packTargetInfo(isolate, annotation->target));
 
         return packedAnnotation;
     }
@@ -126,7 +106,7 @@ namespace IW
 
         packedSelection->Set(v8::String::NewFromUtf8(isolate, "isRequired"), v8::Boolean::New(isolate, selection->isRequired));
         packedSelection->Set(v8::String::NewFromUtf8(isolate, "isMultipleSelectionAllowed"), v8::Boolean::New(isolate, selection->isMultipleSelectionAllowed));
-        packedSelection->Set(v8::String::NewFromUtf8(isolate, "targets"), packTargetElementList(isolate, selection->targets));
+        packedSelection->Set(v8::String::NewFromUtf8(isolate, "targets"), packTargetInfoList(isolate, selection->targets));
 
         return packedSelection;
     }
@@ -207,46 +187,56 @@ namespace IW
         return packedWindow;
     }
 
-    v8::Local<v8::Object> packInfoGroup(v8::Isolate *isolate, InfoGroup &ig)
+    v8::Local<v8::Object> packTargetInfo(v8::Isolate *isolate, TargetInfo &ti)
     {
-        v8::Local<v8::Object> packetInfoGroup = v8::Object::New(isolate);
+        v8::Local<v8::Object> packedTargetInfo = v8::Object::New(isolate);
 
-        packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "name"), v8::String::NewFromTwoByte(isolate, (uint16_t *)ig.name));
-        packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "controleType"), v8::String::NewFromTwoByte(isolate, (uint16_t *)ig.controleType));
-        packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "boundingRect"), packBoundingRect(isolate, ig.boundingRectangle));
-        packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "isContent"), v8::Boolean::New(isolate, ig.isContent));
-        packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "isControl"), v8::Boolean::New(isolate, ig.isControle));
+        packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "name"), v8::String::NewFromTwoByte(isolate, (uint16_t *)ti.name));
+        packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "controleType"), v8::String::NewFromTwoByte(isolate, (uint16_t *)ti.controleType));
+        packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "boundingRect"), packBoundingRect(isolate, ti.boundingRectangle));
+        packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "isContent"), v8::Boolean::New(isolate, ti.isContent));
+        packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "isControl"), v8::Boolean::New(isolate, ti.isControle));
 
-        if (ig.annotation)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "annotation"), packAnnotaion(isolate, ig.annotation));
-        if (ig.dock)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "dock"), packDock(isolate, ig.dock));
-        if (ig.expandCollapse)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "expandCollapse"), packExpandCollapse(isolate, ig.expandCollapse));
-        if (ig.legacyAccessibility)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "legacyAccessibility"), packLegacyAccessibility(isolate, ig.legacyAccessibility));
-        if (ig.rangeValue)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "rangeValue"), packRangeValue(isolate, ig.rangeValue));
-        if (ig.scroll)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "scroll"), packscroll(isolate, ig.scroll));
-        if (ig.selection)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "selection"), packSelection(isolate, ig.selection));
-        if (ig.selectionItem)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "selectionItem"), packSelectionItem(isolate, ig.selectionItem));
-        if (ig.style)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "style"), packStyle(isolate, ig.style));
-        if (ig.text)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "text"), packText(isolate, ig.text));
-        if (ig.toggle)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "toggle"), packToggle(isolate, ig.toggle));
-        if (ig.transform)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "transform"), packTransform(isolate, ig.transform));
-        if (ig.value)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "value"), packValue(isolate, ig.value));
-        if (ig.window)
-            packetInfoGroup->Set(v8::String::NewFromUtf8(isolate, "window"), packWindow(isolate, ig.window));
+        if (ti.annotation)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "annotation"), packAnnotaion(isolate, ti.annotation));
+        if (ti.dock)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "dock"), packDock(isolate, ti.dock));
+        if (ti.expandCollapse)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "expandCollapse"), packExpandCollapse(isolate, ti.expandCollapse));
+        if (ti.legacyAccessibility)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "legacyAccessibility"), packLegacyAccessibility(isolate, ti.legacyAccessibility));
+        if (ti.rangeValue)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "rangeValue"), packRangeValue(isolate, ti.rangeValue));
+        if (ti.scroll)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "scroll"), packscroll(isolate, ti.scroll));
+        if (ti.selection)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "selection"), packSelection(isolate, ti.selection));
+        if (ti.selectionItem)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "selectionItem"), packSelectionItem(isolate, ti.selectionItem));
+        if (ti.style)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "style"), packStyle(isolate, ti.style));
+        if (ti.text)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "text"), packText(isolate, ti.text));
+        if (ti.toggle)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "toggle"), packToggle(isolate, ti.toggle));
+        if (ti.transform)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "transform"), packTransform(isolate, ti.transform));
+        if (ti.value)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "value"), packValue(isolate, ti.value));
+        if (ti.window)
+            packedTargetInfo->Set(v8::String::NewFromUtf8(isolate, "window"), packWindow(isolate, ti.window));
 
-        return packetInfoGroup;
+        return packedTargetInfo;
+    }
+
+    v8::Local<v8::Array> packTargetInfoList(v8::Isolate *isolate, TargetInfoList target)
+    {
+        v8::Local<v8::Array> packedTargetElementList = v8::Array::New(isolate, target.length);
+
+        for (uint32_t i = 0; i < target.length; i++)
+            packedTargetElementList->Set(i, packTargetInfo(isolate, target.elements[i]));
+
+        return packedTargetElementList;
     }
 
     void getInfoFromPoint(const v8::FunctionCallbackInfo<v8::Value> &args)
@@ -265,11 +255,11 @@ namespace IW
             return;
         }
 
-        InfoGroup ig = getInfoGroupFromPoint((long)args[0].As<v8::Number>()->Value(), (long)args[1].As<v8::Number>()->Value());
+        TargetInfo it = getTargetInfoFromPoint((long)args[0].As<v8::Number>()->Value(), (long)args[1].As<v8::Number>()->Value());
 
-        args.GetReturnValue().Set(packInfoGroup(isolate, ig));
+        args.GetReturnValue().Set(packTargetInfo(isolate, it));
 
-        releaseInfoGroup(ig);
+        releaseTargetInfo(it);
     }
 
     void initialize(v8::Local<v8::Object> exports)

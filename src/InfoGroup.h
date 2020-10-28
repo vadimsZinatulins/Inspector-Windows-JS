@@ -1,11 +1,27 @@
 #ifndef __INFO_GROUP_H__
 #define __INFO_GROUP_H__
 
+#include <UIAutomation.h>
 #include <Windows.h>
 
 namespace IW
 {
-    struct TargetElement
+    struct Annotation;
+    struct Dock;
+    struct ExpandCollapse;
+    struct LegacyAccessibility;
+    struct RangeValue;
+    struct Scroll;
+    struct Selection;
+    struct SelectionItem;
+    struct Style;
+    struct Text;
+    struct Toggle;
+    struct Transform;
+    struct Value;
+    struct Window;
+
+    struct TargetInfo
     {
         BSTR name{nullptr};
         BSTR controleType{nullptr};
@@ -14,11 +30,26 @@ namespace IW
 
         BOOL isContent{false};
         BOOL isControle{false};
+
+        Annotation *annotation{nullptr};
+        Dock *dock{nullptr};
+        ExpandCollapse *expandCollapse{nullptr};
+        LegacyAccessibility *legacyAccessibility{nullptr};
+        RangeValue *rangeValue{nullptr};
+        Scroll *scroll{nullptr};
+        Selection *selection{nullptr};
+        SelectionItem *selectionItem{nullptr};
+        Style *style{nullptr};
+        Text *text{nullptr};
+        Toggle *toggle{nullptr};
+        Transform *transform{nullptr};
+        Value *value{nullptr};
+        Window *window{nullptr};
     };
 
-    struct TargetElementList
+    struct TargetInfoList
     {
-        TargetElement *elements{nullptr};
+        TargetInfo *elements{nullptr};
         int length{0};
     };
 
@@ -28,7 +59,7 @@ namespace IW
         BSTR author{nullptr};
         BSTR dateTime{nullptr};
 
-        TargetElement target;
+        TargetInfo target;
     };
 
     struct Dock
@@ -79,7 +110,7 @@ namespace IW
         BOOL isRequired;
         BOOL isMultipleSelectionAllowed;
 
-        TargetElementList targets;
+        TargetInfoList targets;
     };
 
     struct SelectionItem
@@ -132,34 +163,8 @@ namespace IW
         BSTR visualState{nullptr};
     };
 
-    struct InfoGroup
-    {
-        BSTR name{nullptr};
-        BSTR controleType{nullptr};
-
-        RECT boundingRectangle{0, 0, 0, 0};
-
-        BOOL isContent{false};
-        BOOL isControle{false};
-
-        Annotation *annotation{nullptr};
-        Dock *dock{nullptr};
-        ExpandCollapse *expandCollapse{nullptr};
-        LegacyAccessibility *legacyAccessibility{nullptr};
-        RangeValue *rangeValue{nullptr};
-        Scroll *scroll{nullptr};
-        Selection *selection{nullptr};
-        SelectionItem *selectionItem{nullptr};
-        Style *style{nullptr};
-        Text *text{nullptr};
-        Toggle *toggle{nullptr};
-        Transform *transform{nullptr};
-        Value *value{nullptr};
-        Window *window{nullptr};
-    };
-
-    InfoGroup getInfoGroupFromPoint(long x, long y);
-    void releaseInfoGroup(InfoGroup &ig);
+    TargetInfo getTargetInfoFromPoint(long x, long y);
+    void releaseTargetInfo(TargetInfo &ti);
 
 } // namespace IW
 

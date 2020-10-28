@@ -6,10 +6,254 @@
 
 namespace IW
 {
-    InfoGroup getInfoGroupFromPoint(long x, long y)
-    {
-        std::cout << x << " " << y << std::endl;
+    void getInfoFromElement(IUIAutomationElement *element, TargetInfo &targetInfo);
 
+    void getInfoFromElement(IUIAutomationElement *element, TargetInfo &targetInfo)
+    {
+        element->get_CurrentName(&targetInfo.name);
+        element->get_CurrentLocalizedControlType(&targetInfo.controleType);
+        element->get_CurrentBoundingRectangle(&targetInfo.boundingRectangle);
+        element->get_CurrentIsContentElement(&targetInfo.isContent);
+        element->get_CurrentIsControlElement(&targetInfo.isControle);
+
+        doIfPatternExists<UIA_AnnotationPatternId, IUIAutomationAnnotationPattern>(element, [&](IUIAutomationAnnotationPattern *pattern) {
+            Annotation *annotation = new Annotation();
+
+            pattern->get_CurrentAnnotationTypeName(&annotation->name);
+            pattern->get_CurrentAuthor(&annotation->author);
+            pattern->get_CurrentDateTime(&annotation->dateTime);
+            pattern->get_CurrentAnnotationTypeName(&annotation->name);
+
+            IUIAutomationElement *annotaionTargetElement;
+            HRESULT hr = pattern->get_CurrentTarget(&annotaionTargetElement);
+            if (SUCCEEDED(hr) && annotaionTargetElement)
+            {
+                getInfoFromElement(annotaionTargetElement, annotation->target);
+
+                annotaionTargetElement->Release();
+            }
+
+            targetInfo.annotation = annotation;
+        });
+
+        doIfPatternExists<UIA_DockPatternId, IUIAutomationDockPattern>(element, [&](IUIAutomationDockPattern *pattern) {
+            BSTR positions[] = {
+                (BSTR)L"DockPosition_Top",
+                (BSTR)L"DockPosition_Left",
+                (BSTR)L"DockPosition_Bottom",
+                (BSTR)L"DockPosition_Right",
+                (BSTR)L"DockPosition_Fill",
+                (BSTR)L"DockPosition_None",
+            };
+
+            DockPosition posIndex;
+            HRESULT hr = pattern->get_CurrentDockPosition(&posIndex);
+
+            if (SUCCEEDED(hr))
+            {
+                Dock *dock = new Dock();
+                dock->position = positions[posIndex];
+
+                targetInfo.dock = dock;
+            }
+        });
+
+        doIfPatternExists<UIA_ExpandCollapsePatternId, IUIAutomationExpandCollapsePattern>(element, [&](IUIAutomationExpandCollapsePattern *pattern) {
+            BSTR states[] = {
+                (BSTR)L"ExpandCollapseState_Collapsed",
+                (BSTR)L"ExpandCollapseState_Expanded",
+                (BSTR)L"ExpandCollapseState_PartiallyExpanded",
+                (BSTR)L"ExpandCollapseState_LeafNode"};
+
+            ExpandCollapseState stateIndex;
+            HRESULT hr = pattern->get_CurrentExpandCollapseState(&stateIndex);
+
+            if (SUCCEEDED(hr))
+            {
+                ExpandCollapse *expandCollapse = new ExpandCollapse();
+                expandCollapse->state = states[stateIndex];
+
+                targetInfo.expandCollapse = expandCollapse;
+            }
+        });
+
+        doIfPatternExists<UIA_LegacyIAccessiblePatternId, IUIAutomationLegacyIAccessiblePattern>(element, [&](IUIAutomationLegacyIAccessiblePattern *pattern) {
+            LegacyAccessibility *legacyAccessibility = new LegacyAccessibility;
+
+            pattern->get_CurrentDefaultAction(&legacyAccessibility->action);
+            pattern->get_CurrentDescription(&legacyAccessibility->description);
+            pattern->get_CurrentName(&legacyAccessibility->name);
+            pattern->get_CurrentValue(&legacyAccessibility->value);
+
+            targetInfo.legacyAccessibility = legacyAccessibility;
+        });
+
+        doIfPatternExists<UIA_RangeValuePatternId, IUIAutomationRangeValuePattern>(element, [&](IUIAutomationRangeValuePattern *pattern) {
+            RangeValue *rangeValue = new RangeValue();
+
+            pattern->get_CurrentIsReadOnly(&rangeValue->isReadOnly);
+            pattern->get_CurrentLargeChange(&rangeValue->bigChange);
+            pattern->get_CurrentSmallChange(&rangeValue->smallChange);
+            pattern->get_CurrentValue(&rangeValue->currentValue);
+            pattern->get_CurrentMaximum(&rangeValue->maximumValue);
+            pattern->get_CurrentMinimum(&rangeValue->minimumValue);
+
+            targetInfo.rangeValue = rangeValue;
+        });
+
+        doIfPatternExists<UIA_ScrollPatternId, IUIAutomationScrollPattern>(element, [&](IUIAutomationScrollPattern *pattern) {
+            Scroll *scroll = new Scroll();
+
+            pattern->get_CurrentHorizontallyScrollable(&scroll->horizontalScroll.isScrollable);
+            pattern->get_CurrentHorizontalScrollPercent(&scroll->horizontalScroll.scrollPercent);
+            pattern->get_CurrentHorizontalViewSize(&scroll->horizontalScroll.viewSize);
+
+            pattern->get_CurrentVerticallyScrollable(&scroll->verticallScroll.isScrollable);
+            pattern->get_CurrentVerticalScrollPercent(&scroll->verticallScroll.scrollPercent);
+            pattern->get_CurrentVerticalViewSize(&scroll->verticallScroll.viewSize);
+
+            targetInfo.scroll = scroll;
+        });
+
+        doIfPatternExists<UIA_SelectionPatternId, IUIAutomationSelectionPattern>(element, [&](IUIAutomationSelectionPattern *pattern) {
+            Selection *selection = new Selection();
+
+            pattern->get_CurrentIsSelectionRequired(&selection->isRequired);
+            pattern->get_CurrentCanSelectMultiple(&selection->isMultipleSelectionAllowed);
+
+            IUIAutomationElementArray *targetsArray;
+            HRESULT hr = pattern->GetCurrentSelection(&targetsArray);
+            if (SUCCEEDED(hr) && targetsArray)
+            {
+                targetsArray->get_Length(&selection->targets.length);
+
+                selection->targets.elements = new TargetInfo[selection->targets.length];
+
+                for (int i = 0; i < selection->targets.length; i++)
+                {
+                    IUIAutomationElement *target;
+                    HRESULT hr = targetsArray->GetElement(i, &target);
+
+                    if (SUCCEEDED(hr) && target)
+                    {
+                        getInfoFromElement(target, selection->targets.elements[i]);
+
+                        target->Release();
+                    }
+                }
+
+                targetsArray->Release();
+            }
+
+            targetInfo.selection = selection;
+        });
+
+        doIfPatternExists<UIA_SelectionItemPatternId, IUIAutomationSelectionItemPattern>(element, [&](IUIAutomationSelectionItemPattern *pattern) {
+            SelectionItem *selectionItem = new SelectionItem();
+
+            pattern->get_CurrentIsSelected(&selectionItem->isSelected);
+
+            targetInfo.selectionItem = selectionItem;
+        });
+
+        doIfPatternExists<UIA_StylesPatternId, IUIAutomationStylesPattern>(element, [&](IUIAutomationStylesPattern *pattern) {
+            Style *style = new Style();
+
+            pattern->get_CurrentStyleName(&style->name);
+            pattern->get_CurrentExtendedProperties(&style->extendedProperties);
+            pattern->get_CurrentShape(&style->shape);
+            pattern->get_CurrentFillColor(&style->fillColor);
+            pattern->get_CurrentFillPatternColor(&style->fillPatternColor);
+            pattern->get_CurrentStyleId(&style->styleId);
+
+            targetInfo.style = style;
+        });
+
+        doIfPatternExists<UIA_TextPatternId, IUIAutomationTextPattern>(element, [&](IUIAutomationTextPattern *pattern) {
+            Text *text = new Text();
+
+            IUIAutomationTextRange *range;
+            HRESULT hr = pattern->get_DocumentRange(&range);
+            if (SUCCEEDED(hr))
+            {
+                range->GetText(-1, &text->text);
+
+                range->Release();
+            }
+
+            targetInfo.text = text;
+        });
+
+        doIfPatternExists<UIA_TogglePatternId, IUIAutomationTogglePattern>(element, [&](IUIAutomationTogglePattern *pattern) {
+            BSTR states[] = {
+                (BSTR)L"ToggleState_Off",
+                (BSTR)L"ToggleState_On",
+                (BSTR)L"ToggleState_Indeterminate"};
+
+            ToggleState stateIndex;
+            HRESULT hr = pattern->get_CurrentToggleState(&stateIndex);
+            if (SUCCEEDED(hr))
+            {
+                Toggle *toggle = new Toggle();
+                toggle->state = states[stateIndex];
+
+                targetInfo.toggle = toggle;
+            }
+        });
+
+        doIfPatternExists<UIA_TransformPatternId, IUIAutomationTransformPattern>(element, [&](IUIAutomationTransformPattern *pattern) {
+            Transform *transform = new Transform;
+
+            pattern->get_CurrentCanMove(&transform->canMove);
+            pattern->get_CurrentCanResize(&transform->canResize);
+            pattern->get_CurrentCanRotate(&transform->canRotate);
+
+            targetInfo.transform = transform;
+        });
+
+        doIfPatternExists<UIA_ValuePatternId, IUIAutomationValuePattern>(element, [&](IUIAutomationValuePattern *pattern) {
+            Value *value = new Value();
+
+            pattern->get_CurrentIsReadOnly(&value->isReadOnly);
+            pattern->get_CurrentValue(&value->value);
+
+            targetInfo.value = value;
+        });
+
+        doIfPatternExists<UIA_WindowPatternId, IUIAutomationWindowPattern>(element, [&](IUIAutomationWindowPattern *pattern) {
+            BSTR interactionStates[] = {
+                (BSTR)L"WindowInteractionState_Running",
+                (BSTR)L"WindowInteractionState_Closing",
+                (BSTR)L"WindowInteractionState_ReadyForUserInteraction",
+                (BSTR)L"WindowInteractionState_BlockedByModalWindow",
+                (BSTR)L"WindowInteractionState_NotResponding"};
+
+            BSTR visualStates[] = {
+                (BSTR)L"WindowVisualState_Normal",
+                (BSTR)L"WindowVisualState_Maximized",
+                (BSTR)L"WindowVisualState_Minimized"};
+
+            Window *window = new Window();
+
+            pattern->get_CurrentCanMaximize(&window->canMaximize);
+            pattern->get_CurrentCanMinimize(&window->canMinimize);
+            pattern->get_CurrentIsModal(&window->isModal);
+            pattern->get_CurrentIsTopmost(&window->isTopMost);
+
+            WindowInteractionState interationStateIndex;
+            pattern->get_CurrentWindowInteractionState(&interationStateIndex);
+            window->interactionState = interactionStates[interationStateIndex];
+
+            WindowVisualState visualStateIndex;
+            pattern->get_CurrentWindowVisualState(&visualStateIndex);
+            window->visualState = visualStates[visualStateIndex];
+
+            targetInfo.window = window;
+        });
+    }
+
+    TargetInfo getTargetInfoFromPoint(long x, long y)
+    {
         IUIAutomation *pAutomation;
 
         initializeAutomation(&pAutomation);
@@ -17,516 +261,250 @@ namespace IW
         IUIAutomationElement *pElementAtMouse;
         HRESULT hr = pAutomation->ElementFromPoint({x, y}, &pElementAtMouse);
 
-        InfoGroup ig;
+        TargetInfo ti;
 
         if (SUCCEEDED(hr) && pElementAtMouse)
         {
-            std::cout << "Succeeded: " << pElementAtMouse << std::endl;
-            pElementAtMouse->get_CurrentName(&ig.name);
-            pElementAtMouse->get_CurrentLocalizedControlType(&ig.controleType);
-            pElementAtMouse->get_CurrentBoundingRectangle(&ig.boundingRectangle);
-            pElementAtMouse->get_CurrentIsContentElement(&ig.isContent);
-            pElementAtMouse->get_CurrentIsControlElement(&ig.isControle);
-
-            doIfPatternExists<UIA_AnnotationPatternId, IUIAutomationAnnotationPattern>(pElementAtMouse, [&](IUIAutomationAnnotationPattern *pattern) {
-                Annotation *annotation = new Annotation();
-
-                pattern->get_CurrentAnnotationTypeName(&annotation->name);
-                pattern->get_CurrentAuthor(&annotation->author);
-                pattern->get_CurrentDateTime(&annotation->dateTime);
-                pattern->get_CurrentAnnotationTypeName(&annotation->name);
-
-                IUIAutomationElement *target;
-                HRESULT hr = pattern->get_CurrentTarget(&target);
-                if (SUCCEEDED(hr) && target)
-                {
-                    target->get_CurrentName(&annotation->target.name);
-                    target->get_CurrentLocalizedControlType(&annotation->target.controleType);
-                    target->get_CurrentBoundingRectangle(&annotation->target.boundingRectangle);
-
-                    target->get_CurrentIsContentElement(&annotation->target.isContent);
-                    target->get_CurrentIsControlElement(&annotation->target.isControle);
-
-                    target->Release();
-                }
-
-                ig.annotation = annotation;
-            });
-
-            doIfPatternExists<UIA_DockPatternId, IUIAutomationDockPattern>(pElementAtMouse, [&](IUIAutomationDockPattern *pattern) {
-                BSTR positions[] = {
-                    (BSTR)L"DockPosition_Top",
-                    (BSTR)L"DockPosition_Left",
-                    (BSTR)L"DockPosition_Bottom",
-                    (BSTR)L"DockPosition_Right",
-                    (BSTR)L"DockPosition_Fill",
-                    (BSTR)L"DockPosition_None",
-                };
-
-                DockPosition posIndex;
-                HRESULT hr = pattern->get_CurrentDockPosition(&posIndex);
-
-                if (SUCCEEDED(hr))
-                {
-                    Dock *dock = new Dock();
-                    dock->position = positions[posIndex];
-
-                    ig.dock = dock;
-                }
-            });
-
-            doIfPatternExists<UIA_ExpandCollapsePatternId, IUIAutomationExpandCollapsePattern>(pElementAtMouse, [&](IUIAutomationExpandCollapsePattern *pattern) {
-                BSTR states[] = {
-                    (BSTR)L"ExpandCollapseState_Collapsed",
-                    (BSTR)L"ExpandCollapseState_Expanded",
-                    (BSTR)L"ExpandCollapseState_PartiallyExpanded",
-                    (BSTR)L"ExpandCollapseState_LeafNode"};
-
-                ExpandCollapseState stateIndex;
-                HRESULT hr = pattern->get_CurrentExpandCollapseState(&stateIndex);
-
-                if (SUCCEEDED(hr))
-                {
-                    ExpandCollapse *expandCollapse = new ExpandCollapse();
-                    expandCollapse->state = states[stateIndex];
-
-                    ig.expandCollapse = expandCollapse;
-                }
-            });
-
-            doIfPatternExists<UIA_LegacyIAccessiblePatternId, IUIAutomationLegacyIAccessiblePattern>(pElementAtMouse, [&](IUIAutomationLegacyIAccessiblePattern *pattern) {
-                LegacyAccessibility *legacyAccessibility = new LegacyAccessibility;
-
-                pattern->get_CurrentDefaultAction(&legacyAccessibility->action);
-                pattern->get_CurrentDescription(&legacyAccessibility->description);
-                pattern->get_CurrentName(&legacyAccessibility->name);
-                pattern->get_CurrentValue(&legacyAccessibility->value);
-
-                ig.legacyAccessibility = legacyAccessibility;
-            });
-
-            doIfPatternExists<UIA_RangeValuePatternId, IUIAutomationRangeValuePattern>(pElementAtMouse, [&](IUIAutomationRangeValuePattern *pattern) {
-                RangeValue *rangeValue = new RangeValue();
-
-                pattern->get_CurrentIsReadOnly(&rangeValue->isReadOnly);
-                pattern->get_CurrentLargeChange(&rangeValue->bigChange);
-                pattern->get_CurrentSmallChange(&rangeValue->smallChange);
-                pattern->get_CurrentValue(&rangeValue->currentValue);
-                pattern->get_CurrentMaximum(&rangeValue->maximumValue);
-                pattern->get_CurrentMinimum(&rangeValue->minimumValue);
-
-                ig.rangeValue = rangeValue;
-            });
-
-            doIfPatternExists<UIA_ScrollPatternId, IUIAutomationScrollPattern>(pElementAtMouse, [&](IUIAutomationScrollPattern *pattern) {
-                Scroll *scroll = new Scroll();
-
-                pattern->get_CurrentHorizontallyScrollable(&scroll->horizontalScroll.isScrollable);
-                pattern->get_CurrentHorizontalScrollPercent(&scroll->horizontalScroll.scrollPercent);
-                pattern->get_CurrentHorizontalViewSize(&scroll->horizontalScroll.viewSize);
-
-                pattern->get_CurrentVerticallyScrollable(&scroll->verticallScroll.isScrollable);
-                pattern->get_CurrentVerticalScrollPercent(&scroll->verticallScroll.scrollPercent);
-                pattern->get_CurrentVerticalViewSize(&scroll->verticallScroll.viewSize);
-
-                ig.scroll = scroll;
-            });
-
-            doIfPatternExists<UIA_SelectionPatternId, IUIAutomationSelectionPattern>(pElementAtMouse, [&](IUIAutomationSelectionPattern *pattern) {
-                Selection *selection = new Selection();
-
-                pattern->get_CurrentIsSelectionRequired(&selection->isRequired);
-                pattern->get_CurrentCanSelectMultiple(&selection->isMultipleSelectionAllowed);
-
-                IUIAutomationElementArray *targetsArray;
-                HRESULT hr = pattern->GetCurrentSelection(&targetsArray);
-                if (SUCCEEDED(hr) && targetsArray)
-                {
-                    targetsArray->get_Length(&selection->targets.length);
-
-                    selection->targets.elements = new TargetElement[selection->targets.length];
-
-                    for (int i = 0; i < selection->targets.length; i++)
-                    {
-                        IUIAutomationElement *target;
-                        HRESULT hr = targetsArray->GetElement(i, &target);
-
-                        if (SUCCEEDED(hr) && target)
-                        {
-                            target->get_CurrentName(&selection->targets.elements[i].name);
-                            target->get_CurrentLocalizedControlType(&selection->targets.elements[i].controleType);
-                            target->get_CurrentBoundingRectangle(&selection->targets.elements[i].boundingRectangle);
-
-                            target->get_CurrentIsContentElement(&selection->targets.elements[i].isContent);
-                            target->get_CurrentIsControlElement(&selection->targets.elements[i].isControle);
-
-                            target->Release();
-                        }
-                    }
-
-                    targetsArray->Release();
-                }
-
-                ig.selection = selection;
-            });
-
-            doIfPatternExists<UIA_SelectionItemPatternId, IUIAutomationSelectionItemPattern>(pElementAtMouse, [&](IUIAutomationSelectionItemPattern *pattern) {
-                SelectionItem *selectionItem = new SelectionItem();
-
-                pattern->get_CurrentIsSelected(&selectionItem->isSelected);
-
-                ig.selectionItem = selectionItem;
-            });
-
-            doIfPatternExists<UIA_StylesPatternId, IUIAutomationStylesPattern>(pElementAtMouse, [&](IUIAutomationStylesPattern *pattern) {
-                Style *style = new Style();
-
-                pattern->get_CurrentStyleName(&style->name);
-                pattern->get_CurrentExtendedProperties(&style->extendedProperties);
-                pattern->get_CurrentShape(&style->shape);
-                pattern->get_CurrentFillColor(&style->fillColor);
-                pattern->get_CurrentFillPatternColor(&style->fillPatternColor);
-                pattern->get_CurrentStyleId(&style->styleId);
-
-                ig.style = style;
-            });
-
-            doIfPatternExists<UIA_TextPatternId, IUIAutomationTextPattern>(pElementAtMouse, [&](IUIAutomationTextPattern *pattern) {
-                Text *text = new Text();
-
-                IUIAutomationTextRange *range;
-                HRESULT hr = pattern->get_DocumentRange(&range);
-                if (SUCCEEDED(hr))
-                {
-                    range->GetText(-1, &text->text);
-
-                    range->Release();
-                }
-
-                ig.text = text;
-            });
-
-            doIfPatternExists<UIA_TogglePatternId, IUIAutomationTogglePattern>(pElementAtMouse, [&](IUIAutomationTogglePattern *pattern) {
-                BSTR states[] = {
-                    (BSTR)L"ToggleState_Off",
-                    (BSTR)L"ToggleState_On",
-                    (BSTR)L"ToggleState_Indeterminate"};
-
-                ToggleState stateIndex;
-                HRESULT he = pattern->get_CurrentToggleState(&stateIndex);
-                if (SUCCEEDED(hr))
-                {
-                    Toggle *toggle = new Toggle();
-                    toggle->state = states[stateIndex];
-
-                    ig.toggle = toggle;
-                }
-            });
-
-            doIfPatternExists<UIA_TransformPatternId, IUIAutomationTransformPattern>(pElementAtMouse, [&](IUIAutomationTransformPattern *pattern) {
-                Transform *transform = new Transform;
-
-                pattern->get_CurrentCanMove(&transform->canMove);
-                pattern->get_CurrentCanResize(&transform->canResize);
-                pattern->get_CurrentCanRotate(&transform->canRotate);
-
-                ig.transform = transform;
-            });
-
-            doIfPatternExists<UIA_ValuePatternId, IUIAutomationValuePattern>(pElementAtMouse, [&](IUIAutomationValuePattern *pattern) {
-                Value *value = new Value();
-
-                pattern->get_CurrentIsReadOnly(&value->isReadOnly);
-                pattern->get_CurrentValue(&value->value);
-
-                ig.value = value;
-            });
-
-            doIfPatternExists<UIA_WindowPatternId, IUIAutomationWindowPattern>(pElementAtMouse, [&](IUIAutomationWindowPattern *pattern) {
-                BSTR interactionStates[] = {
-                    (BSTR)L"WindowInteractionState_Running",
-                    (BSTR)L"WindowInteractionState_Closing",
-                    (BSTR)L"WindowInteractionState_ReadyForUserInteraction",
-                    (BSTR)L"WindowInteractionState_BlockedByModalWindow",
-                    (BSTR)L"WindowInteractionState_NotResponding"};
-
-                BSTR visualStates[] = {
-                    (BSTR)L"WindowVisualState_Normal",
-                    (BSTR)L"WindowVisualState_Maximized",
-                    (BSTR)L"WindowVisualState_Minimized"};
-
-                Window *window = new Window();
-
-                pattern->get_CurrentCanMaximize(&window->canMaximize);
-                pattern->get_CurrentCanMinimize(&window->canMinimize);
-                pattern->get_CurrentIsModal(&window->isModal);
-                pattern->get_CurrentIsTopmost(&window->isTopMost);
-
-                WindowInteractionState interationStateIndex;
-                pattern->get_CurrentWindowInteractionState(&interationStateIndex);
-                window->interactionState = interactionStates[interationStateIndex];
-
-                WindowVisualState visualStateIndex;
-                pattern->get_CurrentWindowVisualState(&visualStateIndex);
-                window->visualState = visualStates[visualStateIndex];
-
-                ig.window = window;
-            });
+            getInfoFromElement(pElementAtMouse, ti);
 
             pElementAtMouse->Release();
         }
 
         releaseAutomation(pAutomation);
 
-        return ig;
+        return ti;
     }
 
-    void releaseInfoGroup(InfoGroup &ig)
+    void releaseTargetInfo(TargetInfo &ti)
     {
-        auto clearTarget = [](TargetElement &target) {
-            // Clear target name string
-            if (target.name)
-            {
-                SysFreeString(target.name);
-
-                target.name = nullptr;
-            }
-
-            // Clear target controle type string
-            if (target.controleType)
-            {
-                SysFreeString(target.controleType);
-            }
-        };
-
         // Clear name string
-        if (ig.name)
+        if (ti.name)
         {
-            SysFreeString(ig.name);
+            SysFreeString(ti.name);
 
-            ig.name = nullptr;
+            ti.name = nullptr;
         }
 
         // Clear controle type string
-        if (ig.controleType)
+        if (ti.controleType)
         {
-            SysFreeString(ig.controleType);
+            SysFreeString(ti.controleType);
 
-            ig.controleType = nullptr;
+            ti.controleType = nullptr;
         }
 
         // Clear annotation
-        if (ig.annotation)
+        if (ti.annotation)
         {
             // Clear annotation name string
-            if (ig.annotation->name)
+            if (ti.annotation->name)
             {
-                SysFreeString(ig.annotation->name);
+                SysFreeString(ti.annotation->name);
 
-                ig.annotation->name = nullptr;
+                ti.annotation->name = nullptr;
             }
 
             // Clear annotation author string
-            if (ig.annotation->author)
+            if (ti.annotation->author)
             {
-                SysFreeString(ig.annotation->author);
+                SysFreeString(ti.annotation->author);
 
-                ig.annotation->author = nullptr;
+                ti.annotation->author = nullptr;
             }
 
             // Clear annotation date time string
-            if (ig.annotation->dateTime)
+            if (ti.annotation->dateTime)
             {
-                SysFreeString(ig.annotation->dateTime);
+                SysFreeString(ti.annotation->dateTime);
 
-                ig.annotation->dateTime = nullptr;
+                ti.annotation->dateTime = nullptr;
             }
 
             // Clear annotation target
-            clearTarget(ig.annotation->target);
+            releaseTargetInfo(ti.annotation->target);
 
-            delete ig.annotation;
+            delete ti.annotation;
 
-            ig.annotation = nullptr;
+            ti.annotation = nullptr;
         }
 
         // Clear dock
-        if (ig.dock)
+        if (ti.dock)
         {
-            delete ig.dock;
+            delete ti.dock;
 
-            ig.dock = nullptr;
+            ti.dock = nullptr;
         }
 
         // Clear expandCollapse
-        if (ig.expandCollapse)
+        if (ti.expandCollapse)
         {
-            delete ig.expandCollapse;
+            delete ti.expandCollapse;
 
-            ig.expandCollapse = nullptr;
+            ti.expandCollapse = nullptr;
         }
 
         // Clear legacy accessibility
-        if (ig.legacyAccessibility)
+        if (ti.legacyAccessibility)
         {
             // Clear legacy accessibility action string
-            if (ig.legacyAccessibility->action)
+            if (ti.legacyAccessibility->action)
             {
-                SysFreeString(ig.legacyAccessibility->action);
+                SysFreeString(ti.legacyAccessibility->action);
 
-                ig.legacyAccessibility->action = nullptr;
+                ti.legacyAccessibility->action = nullptr;
             }
 
             // Clear legacy accessibility description string
-            if (ig.legacyAccessibility->description)
+            if (ti.legacyAccessibility->description)
             {
-                SysFreeString(ig.legacyAccessibility->description);
+                SysFreeString(ti.legacyAccessibility->description);
 
-                ig.legacyAccessibility->description = nullptr;
+                ti.legacyAccessibility->description = nullptr;
             }
 
             // Clear legacy accessibility name string
-            if (ig.legacyAccessibility->name)
+            if (ti.legacyAccessibility->name)
             {
-                SysFreeString(ig.legacyAccessibility->name);
+                SysFreeString(ti.legacyAccessibility->name);
 
-                ig.legacyAccessibility->name = nullptr;
+                ti.legacyAccessibility->name = nullptr;
             }
 
             // Clear legacy accessibility value string
-            if (ig.legacyAccessibility->value)
+            if (ti.legacyAccessibility->value)
             {
-                SysFreeString(ig.legacyAccessibility->value);
+                SysFreeString(ti.legacyAccessibility->value);
 
-                ig.legacyAccessibility->value = nullptr;
+                ti.legacyAccessibility->value = nullptr;
             }
 
-            delete ig.legacyAccessibility;
+            delete ti.legacyAccessibility;
 
-            ig.legacyAccessibility = nullptr;
+            ti.legacyAccessibility = nullptr;
         }
 
         // Clear range value
-        if (ig.rangeValue)
+        if (ti.rangeValue)
         {
-            delete ig.rangeValue;
+            delete ti.rangeValue;
 
-            ig.rangeValue = nullptr;
+            ti.rangeValue = nullptr;
         }
 
         // Clear scroll
-        if (ig.scroll)
+        if (ti.scroll)
         {
-            delete ig.scroll;
+            delete ti.scroll;
 
-            ig.scroll = nullptr;
+            ti.scroll = nullptr;
         }
 
         // Clear selection
-        if (ig.selection)
+        if (ti.selection)
         {
             // Clear all selection targets
-            for (int i = 0; i < ig.selection->targets.length; i++)
-                clearTarget(ig.selection->targets.elements[i]);
+            for (int i = 0; i < ti.selection->targets.length; i++)
+                releaseTargetInfo(ti.selection->targets.elements[i]);
 
-            delete[] ig.selection->targets.elements;
-            delete ig.selection;
+            delete[] ti.selection->targets.elements;
+            delete ti.selection;
 
-            ig.selection = nullptr;
+            ti.selection = nullptr;
         }
 
         // Clear selection item
-        if (ig.selectionItem)
+        if (ti.selectionItem)
         {
-            delete ig.selectionItem;
+            delete ti.selectionItem;
 
-            ig.selectionItem = nullptr;
+            ti.selectionItem = nullptr;
         }
 
         // Clear style
-        if (ig.style)
+        if (ti.style)
         {
             // Clear style name string
-            if (ig.style->name)
+            if (ti.style->name)
             {
-                SysFreeString(ig.style->name);
+                SysFreeString(ti.style->name);
 
-                ig.style->name = nullptr;
+                ti.style->name = nullptr;
             }
 
             // Clear style extendedProperties string
-            if (ig.style->extendedProperties)
+            if (ti.style->extendedProperties)
             {
-                SysFreeString(ig.style->extendedProperties);
+                SysFreeString(ti.style->extendedProperties);
 
-                ig.style->extendedProperties = nullptr;
+                ti.style->extendedProperties = nullptr;
             }
 
             // Clear style shape string
-            if (ig.style->shape)
+            if (ti.style->shape)
             {
-                SysFreeString(ig.style->shape);
+                SysFreeString(ti.style->shape);
 
-                ig.style->shape = nullptr;
+                ti.style->shape = nullptr;
             }
 
-            delete ig.style;
+            delete ti.style;
 
-            ig.style = nullptr;
+            ti.style = nullptr;
         }
 
         // Clear text
-        if (ig.text)
+        if (ti.text)
         {
-            if (ig.text->text)
+            if (ti.text->text)
             {
-                SysFreeString(ig.text->text);
+                SysFreeString(ti.text->text);
 
-                ig.text->text = nullptr;
+                ti.text->text = nullptr;
             }
 
-            delete ig.text;
+            delete ti.text;
 
-            ig.text = nullptr;
+            ti.text = nullptr;
         }
 
         // Clear toggle
-        if (ig.toggle)
+        if (ti.toggle)
         {
-            delete ig.toggle;
+            delete ti.toggle;
 
-            ig.toggle = nullptr;
+            ti.toggle = nullptr;
         }
 
         // Clear transform
-        if (ig.transform)
+        if (ti.transform)
         {
-            delete ig.transform;
+            delete ti.transform;
 
-            ig.transform = nullptr;
+            ti.transform = nullptr;
         }
 
         // Clear value
-        if (ig.value)
+        if (ti.value)
         {
-            if (ig.value->value)
+            if (ti.value->value)
             {
-                SysFreeString(ig.value->value);
+                SysFreeString(ti.value->value);
 
-                ig.value->value = nullptr;
+                ti.value->value = nullptr;
             }
 
-            delete ig.value;
+            delete ti.value;
 
-            ig.value = nullptr;
+            ti.value = nullptr;
         }
 
         // Clear window
-        if (ig.window)
+        if (ti.window)
         {
-            delete ig.window;
+            delete ti.window;
 
-            ig.window = nullptr;
+            ti.window = nullptr;
         }
     }
 } // namespace IW
